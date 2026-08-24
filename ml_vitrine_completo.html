@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ML Vitrine — Score de Risco de Desengajamento</title>
+<style>
+  :root {
+    --bg: #f6f6f7; --card: #ffffff; --border: #e6e6e6;
+    --text: #3e3e3e; --muted: #8a8a8a;
+    --accent: #EA1D2C; --warn: #C8102E; --danger: #EA1D2C;
+    --info: #991B1B; --new: #C8102E; --success: #991B1B; --table-col: #991B1B;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 1.5rem; }
+  .container { max-width: 1500px; margin: 0 auto; }
+
+  .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); flex-wrap: wrap; }
+  .tab-btn { padding: 0.7rem 1.4rem; background: none; border: none; color: var(--muted); font-size: 0.88rem; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s; white-space: nowrap; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .header { background: linear-gradient(135deg, #EA1D2C, #991B1B); border-radius: 16px; padding: 2rem 2.5rem; margin-bottom: 1.5rem; }
+  .header h1 { font-size: 1.8rem; color: #fff; margin-bottom: 0.5rem; }
+  .header .subtitle { color: rgba(255,255,255,0.9); font-size: 1rem; }
+  .header .stats { display: flex; gap: 1.5rem; margin-top: 1.5rem; flex-wrap: wrap; }
+  .header .stat { background: rgba(255,255,255,0.15); border-radius: 10px; padding: 0.75rem 1.25rem; backdrop-filter: blur(4px); }
+  .header .stat .num { font-size: 1.5rem; font-weight: 700; color: #fff; }
+  .header .stat .label { font-size: 0.8rem; color: rgba(255,255,255,0.8); }
+
+  .box { background: var(--card); border-radius: 14px; padding: 1.5rem 2rem; margin-bottom: 1.5rem; }
+  .box-red { border: 2px solid rgba(234,29,44,0.4); }
+  .box-red h2 { color: var(--danger); font-size: 1.2rem; margin-bottom: 0.75rem; }
+  .box-green { border: 2px solid rgba(153,27,27,0.35); }
+  .box-green h2 { color: var(--success); font-size: 1.2rem; margin-bottom: 0.75rem; }
+  .box-blue { border: 2px solid rgba(200,16,46,0.35); }
+  .box-blue h2 { color: var(--info); font-size: 1.2rem; margin-bottom: 0.75rem; }
+
+  .funnel { display: flex; gap: 1.5rem; flex-wrap: wrap; margin: 1rem 0; }
+  .funnel-step { text-align: center; padding: 1rem 1.5rem; border-radius: 10px; min-width: 140px; }
+  .fun-top { background: rgba(234,29,44,0.08); border: 1px solid rgba(234,29,44,0.3); }
+  .fun-mid { background: rgba(200,16,46,0.08); border: 1px solid rgba(200,16,46,0.3); }
+  .fun-bot { background: rgba(153,27,27,0.08); border: 1px solid rgba(153,27,27,0.3); }
+  .funnel-num { font-size: 2rem; font-weight: 700; }
+  .funnel-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; }
+  .funnel-drop { color: var(--danger); font-size: 0.8rem; font-weight: 600; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-bottom: 1.5rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  @media (max-width: 900px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; }
+  .card h3 { font-size: 1.05rem; margin-bottom: 0.75rem; }
+  .card .big-num { font-size: 2.2rem; font-weight: 700; }
+  .card .sub { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
+  .card.green { border-color: rgba(153,27,27,0.4); } .card.green .big-num { color: var(--success); }
+  .card.red { border-color: rgba(234,29,44,0.4); } .card.red .big-num { color: var(--danger); }
+  .card.yellow { border-color: rgba(200,16,46,0.4); } .card.yellow .big-num { color: var(--warn); }
+  .card.purple { border-color: rgba(234,29,44,0.4); } .card.purple .big-num { color: var(--accent); }
+
+  .group-section { background: var(--card); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 1.25rem; overflow: hidden; }
+  .group-section.new-group { border-color: rgba(234,29,44,0.4); }
+  .group-header { padding: 1.1rem 1.5rem; display: flex; align-items: center; gap: 1rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .group-header .icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; flex-shrink: 0; }
+  .group-header h3 { font-size: 1rem; margin-bottom: 0.15rem; }
+  .group-header p { color: var(--muted); font-size: 0.8rem; }
+  .group-header .badge { margin-left: auto; background: var(--border); color: var(--muted); padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+
+  .table-wrap { padding: 0 1.5rem 1.5rem; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  th { text-align: left; padding: 0.55rem 0.7rem; color: var(--muted); font-weight: 500; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 0.45rem 0.7rem; border-bottom: 1px solid rgba(230,230,230,0.6); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+
+  .col-name { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 0.78rem; color: #3e3e3e; white-space: nowrap; }
+  .col-type { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; font-family: monospace; white-space: nowrap; }
+  .type-int { background: #EA1D2C18; color: #C8102E; } .type-str { background: #991B1B18; color: #991B1B; }
+  .type-float { background: #C8102E18; color: #C8102E; } .type-flag { background: #FCA5A540; color: #C8102E; }
+  .type-array { background: #EA1D2C18; color: #EA1D2C; } .type-date { background: #991B1B18; color: #991B1B; }
+  .col-desc { color: var(--text); max-width: 340px; }
+  .col-fonte { font-size: 0.7rem; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; color: var(--table-col); white-space: nowrap; }
+  .col-fonte strong { color: #3e3e3e; }
+  .col-fonte .calc { color: var(--accent); }
+
+  .tag { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.66rem; font-weight: 600; margin-right: 0.15rem; white-space: nowrap; }
+  .tag-del { background: #EA1D2C20; color: #C8102E; } .tag-sal { background: #991B1B20; color: #991B1B; }
+  .tag-hib { background: #C8102E20; color: #C8102E; } .tag-king { background: #FCA5A540; color: #C8102E; font-size: 0.72rem; }
+  .tag-new { background: #C8102E20; color: #C8102E; font-size: 0.72rem; }
+
+  .target-row { background: rgba(234,29,44,0.04); }
+  .separator { border-top: 2px solid var(--border); }
+  .highlight-row { background: rgba(234,29,44,0.04); }
+  .new-feature-row { border-left: 3px solid var(--new); }
+
+  .note { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; font-size: 0.85rem; color: #991B1B; }
+  .note strong { color: #3e3e3e; }
+
+  pre { background: #fafafa; border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; overflow-x: auto; font-size: 0.78rem; line-height: 1.5; color: #3e3e3e; margin: 0.75rem 0; }
+  pre .kw { color: #EA1D2C; } pre .fn { color: #991B1B; } pre .str { color: #C8102E; } pre .cm { color: #8a8a8a; font-style: italic; } pre .num { color: #EA1D2C; }
+
+  .footer { margin-top: 2rem; padding: 1.25rem 1.5rem; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.85rem; }
+  .footer-item { display: flex; align-items: center; gap: 0.5rem; }
+  .footer-label { color: var(--muted); } .footer-value { font-weight: 700; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+  .summary-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem; text-align: center; }
+  .summary-card .group-letter { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .summary-card .group-title { font-weight: 600; font-size: 0.8rem; margin-bottom: 0.15rem; }
+  .summary-card .group-count { color: var(--muted); font-size: 0.7rem; }
+  .ga { background: #EA1D2C20; color: #EA1D2C; } .gb { background: #991B1B20; color: #991B1B; }
+  .gc { background: #C8102E20; color: #C8102E; } .gd { background: #FCA5A540; color: #C8102E; }
+  .ge { background: #C8102E20; color: #C8102E; } .gf { background: #991B1B20; color: #991B1B; }
+.gg { background: #EA1D2C20; color: #EA1D2C; }
+
+  ol, ul { padding-left: 1.5rem; margin: 0.5rem 0; }
+  li { margin-bottom: 0.35rem; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+
+  .flow-diagram { display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; padding: 1rem; font-size: 0.9rem; }
+  .flow-step { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; text-align: center; }
+  .flow-arrow { font-size: 1.2rem; color: var(--muted); }
+
+  .badge-gold { background: rgba(234,29,44,0.12); color: var(--warn); }
+  .badge-green { background: rgba(153,27,27,0.12); color: var(--success); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+  <h1>ML Vitrine — Score Diário de Risco de Desengajamento</h1>
+  <p class="subtitle"><strong>Todo dia, o modelo decide para cada parceiro:</strong> continua sozinho ou transborda para o comercial? Decisão baseada em tudo que ele fez do D0 até hoje — sem checkpoints fixos.</p>
+  <div class="stats">
+    <div class="stat"><div class="num">4.248</div><div class="label">Parceiros (2.081 pós-censura)</div></div>
+    <div class="stat"><div class="num">~24%</div><div class="label">1pdd em 5d</div></div>
+    <div class="stat"><div class="num">~8.4%</div><div class="label">5pdd em 30d</div></div>
+    <div class="stat"><div class="num">58</div><div class="label">Features</div></div>
+    <div class="stat"><div class="num">D1→D5</div><div class="label">Janela de represamento</div></div>
+    <div class="stat"><div class="num">0.8846</div><div class="label">AUC-ROC (teste)</div></div>
+    <div class="stat"><div class="num">SSI</div><div class="label">escopo ampliado</div></div>
+  </div>
+  <div class="tables">
+  <div><strong>⑤</strong> offer.merchants.merchants <span style="color:rgba(255,255,255,0.65);font-size:0.8rem">(resolução CNPJ → iFood)</span></div>
+  <div><strong>⑥</strong> main.order.orders <span style="color:rgba(255,255,255,0.65);font-size:0.8rem">(histórico pedidos iFood)</span></div>
+  <div><strong>⑦</strong> main.service_merchant_profile.merchant_profile_sanitized_attributes <span style="color:rgba(255,255,255,0.65);font-size:0.8rem">(cardápio iFood)</span></div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab(event, 'tab-problema')"> Problema & Racional</button>
+  <button class="tab-btn" onclick="switchTab(event, 'tab-features')"> Dicionário de Features</button>
+  <button class="tab-btn" onclick="switchTab(event, 'tab-modelo')"> Modelo</button>
+  <button class="tab-btn" onclick="switchTab(event, 'tab-backtest')"> Backtest</button>
+  <button class="tab-btn" onclick="switchTab(event, 'tab-queries')"> Queries & Deploy</button>
+</div>
+
+<!-- ═══════════════════ TAB 1: PROBLEMA & RACIONAL ═══════════════════ -->
+<div class="tab-panel active" id="tab-problema">
+
+<div class="box box-red">
+  <h2> O Problema</h2>
+  <p>Parceiros Vitrine + SSI entram em <strong>Self</strong> e <strong style="color:var(--danger)">esfriam</strong>. <strong style="color:var(--danger)">~92% não chegam a 5pdd.</strong> A janela foi reduzida de 7→5 dias para acelerar o contato do executivo.</p>
+  <div class="funnel">
+    <div class="funnel-step fun-top"><div class="funnel-num" style="color:var(--text)">4.248</div><div class="funnel-label">Parceiros ganhos</div></div>
+    <div class="funnel-step fun-mid"><div class="funnel-num" style="color:var(--warn)">~1.020</div><div class="funnel-label">Fizeram 1pdd ≤5d</div><div class="funnel-drop">↓ 76% perdem</div></div>
+    <div class="funnel-step fun-bot"><div class="funnel-num" style="color:var(--success)">~357</div><div class="funnel-label">5pdd ≤30d</div><div class="funnel-drop">↓ 8.4% de ativação</div></div>
+  </div>
+</div>
+
+<div class="box box-green">
+  <h2> O que o modelo resolve</h2>
+  <p style="font-size:1.1rem;margin:1rem 0">
+    🟢 <strong style="color:var(--success)">Continua sozinho</strong> — está engajando, configurando setup, evoluindo. Mesmo sem 1pdd ainda, se o comportamento indicar progresso.<br>
+    🔴 <strong style="color:var(--danger)">Transborda agora</strong> — está estagnado, não vai engajar sozinho. Precisa do comercial antes de esfriar de vez.
+  </p>
+</div>
+
+<div class="box box-blue">
+  <h2> Racional (baseado no bench com Yuri Laranja)</h2>
+  <div class="grid-2">
+    <div>
+      <h3 style="color:var(--info);margin-bottom:0.5rem">Sem checkpoints fixos</h3>
+      <p style="color:var(--muted);font-size:0.9rem">Nada de "no D3 decide X, no D5 decide Y". <strong>Todo dia o modelo analisa cada parceiro</strong> e recalcula a probabilidade. O parceiro pode ficar 1 dia, 3 dias ou 5 dias — depende do comportamento dele, não de uma regra rígida.</p>
+    </div>
+    <div>
+      <h3 style="color:var(--info);margin-bottom:0.5rem">Modelo único com dia como feature</h3>
+      <p style="color:var(--muted);font-size:0.9rem">Em vez de um modelo por checkpoint, <strong>um modelo só</strong> com <code>dia_observacao</code> como feature. O modelo aprende sozinho que D1 tem peso diferente de D5, e que 3 dias de estagnação no D4 é pior que no D2.</p>
+    </div>
+    <div>
+      <h3 style="color:var(--info);margin-bottom:0.5rem">Inferência diária para todos os ativos</h3>
+      <p style="color:var(--muted);font-size:0.9rem">Todo dia o script pega <strong>todos os parceiros que ainda estão na janela de 5 dias e não converteram</strong>, recalcula as features acumuladas até aquele dia e roda o modelo salvo. Decisão por <strong>percentil por dia</strong> (15/18/20/22/25%).</p>
+    </div>
+    <div>
+      <h3 style="color:var(--info);margin-bottom:0.5rem">Ausência de engajamento é dado</h3>
+      <p style="color:var(--muted);font-size:0.9rem">Parceiro que não interage, não faz setup, não abre o app → isso é o sinal mais forte de que ele <strong>precisa de ajuda do comercial</strong>. O modelo aprende esse padrão.</p>
+    </div>
+  </div>
+</div>
+
+<h2 style="margin:1.5rem 0 1rem">Como funciona o fluxo diário</h2>
+<div class="flow-diagram">
+  <div class="flow-step">⏰ Todo dia 7h<br><small>Script roda</small></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">📊 Features<br><small>Acumuladas D0→hoje<br>para todos ativos ≤7d</small></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">🧠 Modelo<br><small>Carregado da sandbox<br>(já treinado)</small></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">🎯 Score 0→1<br><small>prob_ativar_sozinho<br>para cada parceiro</small></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">🚦 Flag<br><small>percentil por dia<br>🔴 Transborda</small></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">📤 Tabela<br><small>merchant_id + flag<br>→ Salesforce</small></div>
+</div>
+
+<div class="note" style="margin-top:1.5rem">
+  <strong> Regra dos 5 dias + D6:</strong> Após 5 dias de represamento, quem chegou a D6 sem 1º pedido é transbordado automaticamente (<code>D6_FIM_REPRESAMENTO</code>). O modelo atua dentro da janela D1–D5 decidindo, por percentil por dia, se transborda antes.
+</div>
+
+</div>
+
+<!-- ═══════════════════ TAB 2: FEATURES ═══════════════════ -->
+<div class="tab-panel" id="tab-features">
+
+<div class="note">
+  <strong>Tabela:</strong> <code>anotaai.sandbox.ml_vitrine_treino_snapshots</code> — 1 linha por (merchant_id, dia_observacao).<br>
+  <strong>Fontes:</strong> ① <code>leads_analysis</code> · ② <code>merchant_profile</code> (datas eventos) · ③ <code>order_analysis</code> · ④ <code>merchant_profile_history</code><br><strong style="color:var(--warn)">⚠ Grupos C e D removidos (vazamento temporal).</strong> Estado do parceiro e onboarding nao tem snapshot historico.
+  <strong>Regra de ouro:</strong> Toda feature usa dados disponíveis <strong>até o dia do snapshot</strong> (D0→D). Nada de dados futuros.
+</div>
+
+<div class="summary-grid">
+  <div class="summary-card"><div class="group-letter" style="background:rgba(234,29,44,0.12);color:var(--warn)">T</div><div class="group-title">Targets</div><div class="group-count">7</div></div>
+  <div class="summary-card"><div class="group-letter ga">A</div><div class="group-title">Setup — Diário</div><div class="group-count">12</div></div>
+  <div class="summary-card"><div class="group-letter ga">A</div><div class="group-title">Setup — Acumulado</div><div class="group-count">16</div></div>
+  <div class="summary-card"><div class="group-letter gb">B</div><div class="group-title">Pedidos</div><div class="group-count">7</div></div>
+  <div class="summary-card"><div class="group-letter gf">F</div><div class="group-title">Transbordo <span class="tag tag-new">NOVO</span></div><div class="group-count">7</div></div>
+  <div class="summary-card"><div class="group-letter ge">E</div><div class="group-title">Estáticas</div><div class="group-count">12</div></div>
+  <div class="summary-card">
+  <div class="group-letter gg">G</div>
+  <div class="group-title">iFood</div>
+  <div class="group-count">7 features</div>
+</div>
+</div>
+
+<!-- TARGETS -->
+<div class="group-section" style="border-color:rgba(234,29,44,0.4)">
+  <div class="group-header"><div class="icon" style="background:rgba(234,29,44,0.12);color:var(--warn)">T</div><div><h3>Targets — 2 níveis: engajamento + ativação</h3><p>O modelo prevê ambos. target_1pdd_5d = early signal, target_5pdd_30d = goal (target principal).</p></div><span class="badge badge-gold">7 colunas</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr class="target-row"><td class="col-name">target_1pdd_5d</td><td><span class="col-type type-flag">0/1</span></td><td class="col-desc"><strong>Engajamento.</strong> 1º pedido ≤5d. <span style="color:var(--danger)">76% = 0.</span></td><td class="col-fonte"><strong>①</strong>.after_won_1st_concluded_order_date <span class="calc">≤ D+5</span></td></tr>
+      <tr class="target-row"><td class="col-name">target_5pdd_30d</td><td><span class="col-type type-flag">0/1</span></td><td class="col-desc"><strong>Ativação.</strong> 5pdd delivery OU salão ≤30d. <span style="color:var(--danger)">~92% = 0.</span> <span style="color:var(--success)">⭐ target principal</span></td><td class="col-fonte"><span class="calc">CASE</span> (①.dt_5pdd_del ≤ D+30) OR (①.dt_5pdd_sal ≤ D+30)</td></tr>
+      <tr class="target-row"><td class="col-name">target_delivery_5pdd_30d</td><td><span class="col-type type-flag">0/1</span></td><td class="col-desc">5pdd <span class="tag tag-del">Delivery</span> ≤30d.</td><td class="col-fonte"><strong>①</strong>.after_won_5th_concluded_order_date_delivery</td></tr>
+      <tr class="target-row"><td class="col-name">target_salao_5pdd_30d</td><td><span class="col-type type-flag">0/1</span></td><td class="col-desc">5pdd <span class="tag tag-sal">Salão</span> ≤30d.</td><td class="col-fonte"><strong>①</strong>.after_won_5th_concluded_order_date_salao</td></tr>
+      <tr class="target-row"><td class="col-name">dias_ate_1pdd</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Dias → 1º pedido (NULL se não fez).</td><td class="col-fonte"><span class="calc">DATEDIFF</span>(①.1pdd, ①.dt_ganho)</td></tr>
+      <tr class="target-row"><td class="col-name">dias_ate_5pdd_del</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Dias → 5º delivery.</td><td class="col-fonte"><span class="calc">DATEDIFF</span>(①.dt_5pdd_del, ①.dt_ganho)</td></tr>
+      <tr class="target-row"><td class="col-name">dias_ate_5pdd_sal</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Dias → 5º salão.</td><td class="col-fonte"><span class="calc">DATEDIFF</span>(①.dt_5pdd_sal, ①.dt_ganho)</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<!-- KEY FEATURE: dia_observacao -->
+<div class="group-section new-group">
+  <div class="group-header"><div class="icon gf">⭐</div><div><h3>dia_observacao — A feature que elimina checkpoints fixos <span class="tag tag-new">CHAVE</span></h3><p>Em vez de ter um modelo separado para D1, D3, D5, D7, o modelo inclui o próprio dia como feature. Ele aprende sozinho que estar no D5 é diferente de estar no D1.</p></div></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr class="new-feature-row highlight-row"><td class="col-name"><strong>dia_observacao</strong></td><td><span class="col-type type-int">1–5</span></td><td class="col-desc"><strong>Feature que substitui checkpoints fixos.</strong> O modelo aprende a interação: dia × setup_score, dia × estagnação, dia × 1pdd. Ex: "3 dias de estagnação no D4 = risco alto, mas 2 dias no D2 = normal".</td><td class="col-fonte"><span class="calc">DATEDIFF</span>(data_snapshot, dt_ganho)</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<!-- GRUPO A: SETUP DIÁRIO -->
+<div class="group-section">
+  <div class="group-header"><div class="icon ga">A</div><div><h3>Setup — Eventos do DIA D</h3><p>dt_evento = dt_ganho + dia. Flag = 1 se ocorreu exatamente neste dia.</p></div><span class="badge">12</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Tag</th><th>Descrição</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name">fez_login_dia</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Login desktop neste dia?</td><td class="col-fonte"><strong>②</strong>.desktop_first_login <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_pag_online_dia</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Pagamento online?</td><td class="col-fonte"><strong>②</strong>.first_online_payment <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_pag_offline_dia</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Pagamento offline?</td><td class="col-fonte"><strong>②</strong>.first_offline_payment <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_horario_dia</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Horário funcionamento?</td><td class="col-fonte"><strong>②</strong>.first_attendance_hours <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_cardapio_dia</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>10+ itens cardápio?</td><td class="col-fonte"><strong>②</strong>.first_menu_itens_10 <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_area_dia</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-del">D</span></td><td>Área de entrega?</td><td class="col-fonte"><strong>②</strong>.first_area_entrega <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_bot_dia</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-del">D</span></td><td>Ativou robô?</td><td class="col-fonte"><strong>②</strong>.first_bot_ativo <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_tempo_dia</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-del">D</span></td><td>Tempo de entrega?</td><td class="col-fonte"><strong>②</strong>.first_delivery_time <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_vlr_min_dia</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-del">D</span></td><td>Valor mínimo?</td><td class="col-fonte"><strong>②</strong>.first_minimum_value_order <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_setup_salao_dia</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-sal">S</span></td><td>Mesa/comanda/garçom?</td><td class="col-fonte"><strong>②</strong>.first_register_* <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_tipo_atend_dia</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-sal">S</span></td><td>Tipo atendimento?</td><td class="col-fonte"><strong>②</strong>.first_set_service_method <span class="calc">= D+N</span></td></tr>
+      <tr><td class="col-name">fez_tipo_op_dia</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-sal">S</span></td><td>Tipo operação?</td><td class="col-fonte"><strong>②</strong>.first_set_business_model <span class="calc">= D+N</span></td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<!-- GRUPO A: SETUP ACUMULADO -->
+<div class="group-section">
+  <div class="group-header"><div class="icon ga">A</div><div><h3>Setup — ACUMULADO D0→D</h3><p>dt_evento ≤ dt_ganho + dia. Progresso cumulativo.</p></div><span class="badge">16</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Tag</th><th>Descrição</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name">fl_login_acum</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Já fez login?</td><td class="col-fonte"><strong>②</strong>.desktop_first_login <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_pag_online_acum</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Já pag online?</td><td class="col-fonte"><strong>②</strong>.first_online_payment <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_pag_offline_acum</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Já pag offline?</td><td class="col-fonte"><strong>②</strong>.first_offline_payment <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_horario_acum</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Já horário?</td><td class="col-fonte"><strong>②</strong>.first_attendance_hours <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_cardapio_acum</td><td><span class="col-type type-flag">0/1</span></td><td>T</td><td>Já 10+ itens?</td><td class="col-fonte"><strong>②</strong>.first_menu_itens_10 <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_area_acum</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-del">D</span></td><td>Já área?</td><td class="col-fonte"><strong>②</strong>.first_area_entrega <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_bot_acum</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-del">D</span></td><td>Já bot?</td><td class="col-fonte"><strong>②</strong>.first_bot_ativo <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_tempo_acum</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-del">D</span></td><td>Já tempo entrega?</td><td class="col-fonte"><strong>②</strong>.first_delivery_time <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_vlr_min_acum</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-del">D</span></td><td>Já valor mínimo?</td><td class="col-fonte"><strong>②</strong>.first_minimum_value_order <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_setup_salao_acum</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-sal">S</span></td><td>Já salão?</td><td class="col-fonte"><strong>②</strong>.first_register_* <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_tipo_atend_acum</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-sal">S</span></td><td>Já atendimento?</td><td class="col-fonte"><strong>②</strong>.first_set_service_method <span class="calc">≤ D+N</span></td></tr>
+      <tr><td class="col-name">fl_tipo_op_acum</td><td><span class="col-type type-flag">0/1</span></td><td><span class="tag tag-sal">S</span></td><td>Já operação?</td><td class="col-fonte"><strong>②</strong>.first_set_business_model <span class="calc">≤ D+N</span></td></tr>
+      <tr class="separator"><td class="col-name"><strong>setup_score_delivery_acum</strong></td><td><span class="col-type type-int">0–9</span></td><td><span class="tag tag-del">D</span></td><td>Soma 9 flags.</td><td class="col-fonte"><span class="calc">SOMA</span> ≤ D+N</td></tr>
+      <tr><td class="col-name"><strong>setup_score_salao_acum</strong></td><td><span class="col-type type-int">0–8</span></td><td><span class="tag tag-sal">S</span></td><td>Soma 8 flags.</td><td class="col-fonte"><span class="calc">SOMA</span> ≤ D+N</td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>pct_setup_completo</strong></td><td><span class="col-type type-float">%</span></td><td>T</td><td>% exigido pelo tag (Delivery=9, Salão=8, Híbrido=12).</td><td class="col-fonte"><span class="calc">ROUND</span>(score*100/total,1)</td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>dias_sem_avancar_setup</strong></td><td><span class="col-type type-int">INT</span></td><td>T</td><td style="color:var(--danger)"><strong>Estagnação.</strong> Dias desde última config.</td><td class="col-fonte"><span class="calc">DATEDIFF</span>(D+N, <span class="calc">GREATEST</span>(todas dt_*))</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<!-- GRUPO B: PEDIDOS -->
+<div class="group-section">
+  <div class="group-header"><div class="icon gb">B</div><div><h3>Pedidos — Diários + Acumulados</h3><p>Pedidos finalizados no dia e acumulados desde o ganho. Fonte: ③ <code>order_analysis</code>.</p></div><span class="badge">7</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name">novos_pedidos_del_dia</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Pedidos <span class="tag tag-del">Delivery</span> finalizados neste dia.</td><td class="col-fonte"><strong>③</strong> SUM WHERE order_type='DELIVERY'</td></tr>
+      <tr><td class="col-name">novos_pedidos_sal_dia</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Pedidos <span class="tag tag-sal">Salão</span> finalizados neste dia.</td><td class="col-fonte"><strong>③</strong> SUM WHERE order_type='SALAO'</td></tr>
+      <tr><td class="col-name">novos_pedidos_total_dia</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Total de pedidos finalizados neste dia.</td><td class="col-fonte"><strong>③</strong> SUM todos os tipos</td></tr>
+      <tr><td class="col-name">qtd_pedidos_del_acum</td><td><span class="col-type type-int">INT</span></td><td class="col-desc"><span class="tag tag-del">Delivery</span> acumulados D0→D.</td><td class="col-fonte"><span class="calc">SUM OVER</span>(PARTITION BY merchant_id ORDER BY dia)</td></tr>
+      <tr><td class="col-name">qtd_pedidos_sal_acum</td><td><span class="col-type type-int">INT</span></td><td class="col-desc"><span class="tag tag-sal">Salão</span> acumulados D0→D.</td><td class="col-fonte"><span class="calc">SUM OVER</span>(PARTITION BY merchant_id ORDER BY dia)</td></tr>
+      <tr><td class="col-name">qtd_pedidos_total_acum</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Total acumulado de pedidos D0→D.</td><td class="col-fonte"><span class="calc">SUM OVER</span>(PARTITION BY merchant_id ORDER BY dia)</td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>fl_1pdd_acum</strong> ⭐</td><td><span class="col-type type-flag">0/1</span></td><td class="col-desc"><strong>Já fez 1º pedido?</strong> Feature mais forte — 90% dos ativados têm 1pdd em D7.</td><td class="col-fonte"><strong>①</strong>.dt_1pdd <span class="calc">≤ D+N</span></td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<!-- GRUPO F: TRANSBORDO -->
+<div class="group-section new-group">
+  <div class="group-header"><div class="icon gf">F</div><div><h3>Transbordo Real — Último dia Self → Comercial <span class="tag tag-new">NOVO</span></h3><p>Histórico real de transbordo do parceiro. Fonte: ④ <code>merchant_profile_history</code> (filtro: <code>activation_project_responsible_name='Self'</code>).</p></div><span class="badge new-badge">7</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name">teve_transbordo</td><td><span class="col-type type-flag">0/1</span></td><td class="col-desc">Já passou por transbordo alguma vez?</td><td class="col-fonte"><strong>④</strong> merchant_id IS NOT NULL</td></tr>
+      <tr><td class="col-name">dt_ultimo_self</td><td><span class="col-type type-date">DATE</span></td><td class="col-desc">Data do último dia como Self (antes do transbordo).</td><td class="col-fonte"><strong>④</strong> MAX(reference_date)</td></tr>
+      <tr><td class="col-name">dt_transbordo</td><td><span class="col-type type-date">DATE</span></td><td class="col-desc">Data em que o parceiro foi transbordado para o comercial.</td><td class="col-fonte"><strong>④</strong> DATE_ADD(MAX(reference_date), 1)</td></tr>
+      <tr><td class="col-name">dia_transbordo_pos_ganho</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Quantos dias após o ganho ocorreu o transbordo.</td><td class="col-fonte"><span class="calc">DATEDIFF</span>(dt_transbordo, dt_ganho)</td></tr>
+      <tr class="highlight-row new-feature-row"><td class="col-name"><strong>fl_ja_transbordou</strong> ⭐</td><td><span class="col-type type-flag">0/1</span></td><td class="col-desc"><strong>Já foi transbordado até este dia D?</strong> Feature chave — após transbordo, comportamento muda.</td><td class="col-fonte"><strong>④</strong> dt_transbordo <span class="calc">≤ D+N</span></td></tr>
+      <tr class="new-feature-row"><td class="col-name">dias_desde_transbordo</td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Dias desde o transbordo (negativo = ainda Self).</td><td class="col-fonte"><span class="calc">DATEDIFF</span>(D+N, dt_transbordo)</td></tr>
+      <tr class="new-feature-row"><td class="col-name">fase_transbordo</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Fase atual: 'Self', 'Pos-Transbordo' ou 'Sem registro'.</td><td class="col-fonte"><span class="calc">CASE</span> (④ IS NULL → 'Sem registro', dt_transbordo ≤ D+N → 'Pos-Transbordo', ELSE 'Self')</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<!-- GRUPO E: ESTÁTICAS -->
+<div class="group-section">
+  <div class="group-header"><div class="icon ge">E</div><div><h3>Características Estáticas do Parceiro</h3><p>Perfil do lead, plano, segmento, origem. Não mudam com o tempo. Fonte: ① <code>anotaai_leads_analysis</code>.</p></div><span class="badge">14</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr class="highlight-row"><td class="col-name"><strong>tag_multiproduto</strong></td><td><span class="col-type type-str">STRING</span></td><td class="col-desc"><span class="tag tag-del">Delivery</span> (98.5%) · <span class="tag tag-sal">Salão</span> · Híbrido. Define quais flags de setup são exigidas.</td><td class="col-fonte"><span class="calc">CASE</span> ①.multiprodutos_pedidos</td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>lead_prioritization</strong></td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Prioridade do lead. P0=50% ativação · P1=21% · P2=18% · Demais &lt;12%.</td><td class="col-fonte"><strong>①</strong>.lead_prioritization</td></tr>
+      <tr><td class="col-name">faixa_propensao_score_400</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Faixa do score de propensão 400+ (dado iFood embutido na leads_analysis).</td><td class="col-fonte"><strong>①</strong>.faixa_propensao_score_400</td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>plano_depara</strong></td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">GA / Start / <span style="color:var(--danger)">Demais</span>. Demais = 0% ativação — regra quase direta.</td><td class="col-fonte"><span class="calc">CASE</span> ①.plano LIKE</td></tr>
+      <tr><td class="col-name">payment_method</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Forma de pagamento declarada pelo parceiro.</td><td class="col-fonte"><strong>①</strong>.payment_method</td></tr>
+      <tr><td class="col-name">invoicing</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Faixa de faturamento declarada (dado iFood).</td><td class="col-fonte"><strong>①</strong>.invoicing</td></tr>
+      <tr><td class="col-name">computer_normalized</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Usa computador? (Sim/Não — dado iFood).</td><td class="col-fonte"><strong>①</strong>.computer_normalized</td></tr>
+      <tr><td class="col-name">order_day_normalized</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Dia com mais pedidos (dado iFood).</td><td class="col-fonte"><strong>①</strong>.order_day_normalized</td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>dia_semana_ganho</strong></td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Seg–Dom. Ganhar na sexta vs terça muda a janela útil de setup.</td><td class="col-fonte"><span class="calc">DAYOFWEEK</span>(①.sale_won_at)</td></tr>
+      <tr><td class="col-name">canal_venda</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc"><strong>SSI</strong> / Comercial / Vitrine / Self / VITRINE iFood. <span class="tag tag-new">SSI no topo</span></td><td class="col-fonte"><span class="calc">CASE</span> ①.source + ①.sale_status</td></tr>
+      <tr class="new-feature-row"><td class="col-name"><strong>origem_detalhe</strong> <span class="tag tag-new">NOVO</span></td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Source bruto do lead (ex: <code>SSI SELF SOFIA</code>, <code>SELF IFOOD SSI</code>, <code>DROP SELF SIGN IN</code>).</td><td class="col-fonte"><strong>①</strong>.source</td></tr>
+      <tr class="new-feature-row"><td class="col-name"><strong>tela</strong> <span class="tag tag-new">NOVO</span></td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Tela fina do SSI: Drop interesse / Fallback CPF / Interessados com contrato (NULL p/ não-SSI).</td><td class="col-fonte"><span class="calc">derivado</span> faster_data.events → self_sign_in</td></tr>
+      <tr><td class="col-name">multiprodutos_gestao</td><td><span class="col-type type-array">ARRAY</span></td><td class="col-desc">Produtos de gestão contratados (Gestor de Estoque, Frente de Caixa, NF, etc).</td><td class="col-fonte"><strong>①</strong>.multiprodutos_gestao</td></tr>
+      <tr><td class="col-name">lead_qualification</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">Qualificação do lead (SQL / MQL / Outros).</td><td class="col-fonte"><strong>①</strong>.lead_qualification</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<!-- GRUPO G: iFOOD -->
+<div class="group-section new-group">
+  <div class="group-header"><div class="icon gg">G</div><div><h3>Dados do Parceiro no iFood — Score Vitrine 400+ <span class="tag tag-new">NOVO</span></h3><p>Métricas consolidadas do ecossistema iFood. Estáticas — não mudam por dia. Match: 98.1% dos parceiros.</p></div><span class="badge new-badge">7</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name">merchant_id_ifood</td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">ID do parceiro no ecossistema iFood (resolvido via CNPJ ou ifood_merchant_id).</td><td class="col-fonte"><strong>⑤</strong> offer.merchants <span class="calc">JOIN CNPJ</span></td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>estado_ifood</strong></td><td><span class="col-type type-str">STRING</span></td><td class="col-desc">UF do parceiro no iFood. SP 32% · RJ 13% · MG 8% · PR 6% · GO 5% · Demais 36%.</td><td class="col-fonte"><strong>⑤</strong>.address_state</td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>media_pedidos_mes_ifood</strong></td><td><span class="col-type type-float">FLOAT</span></td><td class="col-desc">Média mensal de pedidos no iFood desde Jan/2025. Volume alto = parceiro estabelecido.</td><td class="col-fonte"><strong>⑥</strong> main.order.orders <span class="calc">AVG mensal</span></td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>pico_pedidos_mes_ifood</strong></td><td><span class="col-type type-float">FLOAT</span></td><td class="col-desc">Maior volume mensal já registrado. Indica capacidade operacional máxima.</td><td class="col-fonte"><strong>⑥</strong> main.order.orders <span class="calc">MAX mensal</span></td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong>meses_com_400_ifood</strong></td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Quantos meses bateu 400+ pedidos desde 2025. ≥3 meses = altíssimo potencial.</td><td class="col-fonte"><strong>⑥</strong> main.order.orders <span class="calc">SUM(CASE ≥400)</span></td></tr>
+      <tr class="highlight-row"><td class="col-name"><strong></strong></td><td><span class="col-type type-int">INT</span></td><td class="col-desc">Itens ativos no cardápio do iFood. Cardápio robusto (≥60 itens) = operação madura.</td><td class="col-fonte"><strong>⑦</strong> merchant_profile_sanitized <span class="calc">.active_items</span></td></tr>
+      <tr class="highlight-row new-feature-row"><td class="col-name"><strong>score_vitrine_label</strong></td><td><span class="col-type type-str">STRING</span></td><td class="col-desc"><strong>ALTISSIMA / ALTA / MEDIA / BAIXA.</strong> Classificação baseada em plano + estado + volume de pedidos + cardápio.</td><td class="col-fonte"><span class="calc">CASE</span> (⑤ + ⑥ + ⑦ + plano)</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+</div>
+
+<!-- ═══════════════════ TAB 3: MODELO ═══════════════════ -->
+<div class="tab-panel" id="tab-modelo">
+
+<div class="box box-green">
+  <h2> Arquitetura — Modelo Único (sem checkpoints fixos)</h2>
+  <div class="grid-2">
+    <div>
+      <h3 style="color:var(--success)">Por que um modelo só?</h3>
+      <p style="color:var(--muted);font-size:0.9rem">Em vez de treinar um modelo para D1, outro para D3, outro para D5, D7... treinamos <strong>um modelo único</strong> onde <code>dia_observacao</code> é uma feature. O XGBoost aprende automaticamente as interações: "3 dias de estagnação no D4 é pior que 3 dias no D2", "setup 50% no D1 é ótimo, no D7 é alarmante".</p>
+      <p style="color:var(--muted);font-size:0.9rem;margin-top:0.75rem">Isso também resolve o problema de dados: se treinássemos modelos separados, o modelo D7 só veria parceiros que chegaram ao D7 (viés de sobrevivência). Com um modelo único, todos os snapshots de todos os dias entram no treino.</p>
+    </div>
+    <div>
+      <h3 style="color:var(--success)">Algoritmo: XGBoost (Diário D1→D5)</h3>
+      <ul style="color:var(--muted);font-size:0.9rem">
+        <li><strong>58 features</strong> (42 num + 16 cat) — split 4 vias: treino / calibracao / threshold / teste.</li>
+        <li><strong>Target:</strong> <code>target_5pdd_30d</code> (~8.4% positivo)</li>
+        <li><strong>Calibracao:</strong> IsotonicRegression (Brier CAL 0.0722, melhoria 26.9%)</li>
+        <li><strong>AUC-ROC teste:</strong> 0.8846 (CI 95% [0.832, 0.935]) · <strong>AUC-PR:</strong> 0.5830 (baseline 0.076)</li>
+        <li><strong>Validação:</strong> temporal (não aleatória) — sem data leakage</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 style="margin:1.5rem 0 1rem">Como o modelo decide (inferência diária)</h2>
+<div class="grid-3">
+  <div class="card">
+    <h3>1. Todo dia às 7h</h3>
+    <p style="color:var(--muted);font-size:0.9rem">Script busca todos os parceiros com ganho entre D1 e D5 que ainda não fizeram 1pdd. Para cada um, calcula as features acumuladas até aquele dia (D0→hoje).</p>
+  </div>
+  <div class="card">
+    <h3>2. Modelo carregado do Workspace</h3>
+    <p style="color:var(--muted);font-size:0.9rem">O modelo já foi treinado e serializado (<code>ml_vitrine_model.pkl</code>). O script diário NÃO retreina — só carrega e faz <code>model.predict_proba()</code>.</p>
+  </div>
+  <div class="card">
+    <h3>3. Percentil por dia + Flag</h3>
+    <p style="color:var(--muted);font-size:0.9rem">Para cada dia, transborda os <strong>piores N%</strong> por <code>prob_ativar_sozinho</code> (D1 15% → D5 25%). D6 = transbordo obrigatório de quem não fez 1pdd.</p>
+  </div>
+</div>
+
+<h2 style="margin:1.5rem 0 1rem">Threshold — como calibrar</h2>
+<div class="card">
+  <table style="width:100%">
+    <thead><tr><th>Dia</th><th>% transbordados</th><th>Threshold de prob</th></tr></thead>
+    <tbody>
+      <tr><td style="font-weight:700">D1</td><td>15%</td><td>~0.033</td></tr>
+      <tr><td style="font-weight:700">D2</td><td>18%</td><td>~0.033</td></tr>
+      <tr><td style="font-weight:700">D3</td><td>20%</td><td>~0.052</td></tr>
+      <tr><td style="font-weight:700">D4</td><td>22%</td><td>~0.052</td></tr>
+      <tr><td style="font-weight:700">D5</td><td>25%</td><td>~0.052</td></tr>
+      <tr class="highlight-row"><td style="font-weight:700">D6</td><td>100% (obrigatório)</td><td>gate D6</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--muted);font-size:0.8rem;margin-top:0.75rem"><strong>Percentil por dia</strong> (não threshold fixo): transborda os piores N% de cada dia. O threshold no artefato é só metadata — quem manda no dia a dia é o percentil. Para calibrar, ajustar os % por dia conforme capacidade do time.</p>
+</div>
+
+<h2 style="margin:1.5rem 0 1rem">Top features esperadas (baseado na EDA)</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Feature</th><th>Poder</th><th>Evidência</th></tr></thead>
+  <tbody>
+    <tr class="highlight-row"><td>1</td><td class="col-name">fl_1pdd_acum</td><td style="color:var(--danger);font-weight:700">0.260</td><td>Feature mais forte — já fez 1º pedido?</td></tr>
+    <tr><td>2</td><td class="col-name">qtd_pedidos_total_acum</td><td style="color:var(--warn);font-weight:700">0.056</td><td>Volume de pedidos acumulado</td></tr>
+    <tr><td>3</td><td class="col-name">qtd_pedidos_del_acum</td><td style="color:var(--warn);font-weight:700">0.043</td><td>Pedidos delivery acumulados</td></tr>
+    <tr><td>4</td><td class="col-name">setup_score_salao_acum</td><td style="color:var(--warn);font-weight:700">0.038</td><td>Setup salão acumulado</td></tr>
+    <tr><td>5</td><td class="col-name">pct_setup_completo</td><td style="color:var(--warn);font-weight:700">0.038</td><td>% do setup exigido concluído</td></tr>
+    <tr><td>6</td><td class="col-name">canal_venda</td><td style="color:var(--warn);font-weight:700">0.022</td><td>Canal (SSI / Comercial / Vitrine / Self)</td></tr>
+    <tr><td>7</td><td class="col-name">origem_detalhe</td><td style="color:var(--warn);font-weight:700">0.021</td><td>Source bruto (SSI SELF SOFIA, etc)</td></tr>
+    <tr><td>8</td><td class="col-name">dias_sem_avancar_setup</td><td>Médio</td><td>Estagnação no setup</td></tr>
+  </tbody>
+</table></div>
+
+<div class="note" style="margin-top:1rem">
+  <strong> Boas práticas:</strong> (1) Modelo único com <code>dia_observacao</code> como feature, sem checkpoints fixos.
+  (2) Treinar uma vez, serializar no Workspace, script diário só faz features + inferência.
+  (3) Data de referência: toda feature considera apenas dados disponíveis até o dia da previsão.
+  (4) Decisão por percentil por dia (15/18/20/22/25%), calibrar com teste A/B. (5) Após 5 dias, transbordar no D6 independente do score.
+</div>
+
+</div>
+
+<!-- ═══════════════════ TAB 4: BACKTEST ═══════════════════ -->
+<div class="tab-panel" id="tab-backtest">
+
+<h2 style="margin-bottom:1rem"> Backtest real — modelo v6 (SSI + janela 5 dias)</h2>
+<p style="color:var(--muted);margin-bottom:1.5rem">Base: 2.081 parceiros fechados (censura 30d). Modelo XGBoost real (58 features) com decisão por percentil por dia + gate D6.</p>
+
+<div class="grid-3">
+  <div class="card green">
+    <h3>🟢 Convertem sozinhos</h3>
+    <div class="big-num">464</div>
+    <div class="sub">22.3% dos parceiros</div>
+    <div class="sub" style="margin-top:0.5rem;color:var(--success)">D0_VERDE + D1–D5_VERDE</div>
+    <div class="sub">— engajam e ativam sem acionamento</div>
+  </div>
+  <div class="card yellow">
+    <h3>🔴 Transbordados por percentil (D1–D5)</h3>
+    <div class="big-num">1.147</div>
+    <div class="sub">55.1% dos parceiros</div>
+    <div class="sub" style="margin-top:0.5rem;color:var(--warn)">D1–D5_TB (antecipado)</div>
+    <div class="sub">— contato antecipado, compra runway</div>
+  </div>
+  <div class="card red">
+    <h3>🔴 Transbordo obrigatório (D6)</h3>
+    <div class="big-num">470</div>
+    <div class="sub">22.6% dos parceiros</div>
+    <div class="sub" style="margin-top:0.5rem;color:var(--danger)">D6_TB_OBRIG (piso)</div>
+    <div class="sub">— chegou ao fim sem 1pdd</div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Leitura do backtest:</strong> total de <strong>1.617 transbordos (77.7%)</strong> e <strong>464 conversões (22.3%)</strong>. O D6 é o piso fixo (~23%) — não se reduz sem encurtar a janela de novo. A alavanca ajustável é o percentil D1–D5 (~55%). Como a base real de "quem tem potencial" é ~8% (5pdd) / ~24% (1pdd), o percentil pode ser baixado (ex. 10/12/15/18/20) se o time executivo não der conta do volume.
+</div>
+
+<h2 style="margin:1.5rem 0 1rem"> Distribuição por dia de transbordo</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Dia</th><th>Transbordos</th><th>% do total</th><th>Tipo</th></tr></thead>
+  <tbody>
+    <tr><td>D1</td><td>277</td><td>17.1%</td><td>percentil 15%</td></tr>
+    <tr><td>D2</td><td>271</td><td>16.8%</td><td>percentil 18%</td></tr>
+    <tr><td>D3</td><td>238</td><td>14.7%</td><td>percentil 20%</td></tr>
+    <tr><td>D4</td><td>196</td><td>12.1%</td><td>percentil 22%</td></tr>
+    <tr><td>D5</td><td>165</td><td>10.2%</td><td>percentil 25%</td></tr>
+    <tr class="highlight-row"><td><strong>D6</strong></td><td><strong>470</strong></td><td><strong>29.1%</strong></td><td>obrigatório (gate)</td></tr>
+  </tbody>
+</table></div>
+
+<h2 style="margin:1.5rem 0 1rem"> Leitura do modelo (avaliação no teste)</h2>
+<div class="grid-2">
+  <div class="card green">
+    <h3>Discriminação</h3>
+    <table style="width:100%;margin-top:0.75rem">
+      <tr><td>AUC-ROC</td><td style="text-align:right;font-weight:700;color:var(--success)">0.8846</td></tr>
+      <tr><td>AUC-PR (baseline 0.076)</td><td style="text-align:right;font-weight:700;color:var(--success)">0.5830</td></tr>
+      <tr><td>Brier (calibração)</td><td style="text-align:right;font-weight:700">0.0454</td></tr>
+    </table>
+  </div>
+  <div class="card purple">
+    <h3>Trade-off (threshold ótimo 0.06)</h3>
+    <table style="width:100%;margin-top:0.75rem">
+      <tr><td>Recall (pega quem ativa)</td><td style="text-align:right;font-weight:700;color:var(--accent)">83.8%</td></tr>
+      <tr><td>Precision</td><td style="text-align:right;font-weight:700">21.3%</td></tr>
+      <tr><td>F1</td><td style="text-align:right;font-weight:700">0.340</td></tr>
+    </table>
+  </div>
+</div>
+
+<p style="color:var(--muted);font-size:0.85rem;margin-top:0.5rem">
+  <b>Nota:</b> o threshold ótimo (0.06) é só referência. Em produção a decisão é por <strong>percentil por dia</strong>, não threshold fixo — porque o target 5pdd é raro (8.4%) e a mediana das probabilidades é baixa (~0.05). Um threshold fixo de 0.20 transbordaria ~95% da base; o percentil controla o volume de forma previsível.
+</p>
+
+<h2 style="margin:1.5rem 0 1rem"> KPIs de sucesso (Yuri)</h2>
+<div class="grid-3">
+  <div class="card green"><h3>Conversão global não pode cair</h3><div class="big-num" style="font-size:1.2rem">Self + Comercial ≥ atual</div><div class="sub">O volume total de ativados não pode piorar.</div></div>
+  <div class="card purple"><h3>Share autônomo deve aumentar</h3><div class="big-num" style="font-size:1.2rem">Self / Total ↑</div><div class="sub">Do total de convertidos, mais fizeram sozinhos.</div></div>
+  <div class="card yellow"><h3>Comercial mais eficiente</h3><div class="big-num" style="font-size:1.2rem">Qualidade > Quantidade</div><div class="sub">Comercial recebe só quem realmente precisa.</div></div>
+</div>
+
+<h2 style="margin:1.5rem 0 1rem;color:var(--success)">💡 Piloto A/B obrigatório</h2>
+
+<div class="box box-blue">
+  <p style="color:var(--text)">O backtest acima mede <strong>seleção</strong>, não <strong>causalidade</strong>. Para atribuir efeito ao modelo (e não à sazonalidade ou mudança do time), é obrigatório um piloto A/B controlado:</p>
+  <ol style="margin-top:0.75rem">
+    <li><strong>Grupo controle:</strong> regra atual (Self até 5 dias, D6 obrigatório)</li>
+    <li><strong>Grupo teste:</strong> decisão do modelo (percentil por dia D1–D5)</li>
+    <li><strong>Métricas:</strong> 1pdd 5d, 5pdd 30d, share Self, conversão global</li>
+    <li><strong>Duração:</strong> 2–4 semanas para significância</li>
+  </ol>
+</div>
+
+<p style="color:var(--muted);font-size:0.85rem;margin-top:1rem">
+<b>Escopo:</b> Vitrine + SSI (<code>source LIKE '%SSI%'</code>). Janela 5 dias + gate D6.<br>
+<b>Modelo:</b> XGBoost v6, 58 features (42 num + 16 cat). AUC-ROC 0.8846, AUC-PR 0.5830, Brier 0.0454.<br>
+<b>Top features:</b> fl_1pdd_acum, qtd_pedidos_total_acum, qtd_pedidos_del_acum, setup_score_salao_acum, pct_setup_completo, canal_venda, origem_detalhe, dias_sem_avancar_setup.<br>
+<b>Regras:</b> percentil por dia (15/18/20/22/25%) + D6 obrigatório. Grupos C/D (estado atual + onboarding) removidos por vazamento temporal.
+</p>
+
+</div>
+
+<!-- ═══════════════════ TAB 5: QUERIES & DEPLOY ═══════════════════ -->
+<div class="tab-panel" id="tab-queries">
+
+<h2> Query 1: Extração (SQL — Databricks)</h2>
+<p style="color:var(--muted)">Cria <code>anotaai.sandbox.ml_vitrine_treino_snapshots</code>. Arquivo: <code>ml_vitrine_01_extracao.sql</code> (v7).</p>
+<pre style="max-height:500px;overflow-y:auto;font-size:0.75rem">-- v7: janela 5 dias (D1-D5) + escopo SSI + features origem_detalhe/tela
+-- Filtro: (sale_source='iFood' AND (VITRINE OR showcase)) OR source LIKE '%SSI%'
+-- CTE dias: 1..5 (nao mais 1..7)
+-- target_1pdd_5d (<= D+5) + target_5pdd_30d (<= D+30)
+-- Grupos C/D (estado atual + onboarding) REMOVIDOS por vazamento temporal
+
+-- Conteudo completo no arquivo ml_vitrine_01_extracao.sql (v7)
+-- Consultar o arquivo atualizado no repo local.</pre>
+
+<h2 style="margin:1.5rem 0 1rem"> Query 2: Treino do Modelo (Python — Databricks)</h2>
+<pre><span class="cm"># Executar UMA VEZ. Salva modelo em sandbox.</span>
+<span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> xgboost <span class="kw">as</span> xgb
+<span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> train_test_split
+<span class="kw">import</span> pickle
+
+<span class="cm"># 1. Carregar base de treino</span>
+df = spark.table(<span class="str">"anotaai.sandbox.ml_vitrine_treino_snapshots"</span>).toPandas()
+
+<span class="cm"># 2. Separar features e target</span>
+target_col = <span class="str">"target_5pdd_30d"</span>
+id_cols = [<span class="str">"merchant_id"</span>, <span class="str">"crmdb_id"</span>, <span class="str">"deal_id"</span>, <span class="str">"merchant_name"</span>,
+           <span class="str">"dt_ganho"</span>, <span class="str">"dia_observacao"</span>, <span class="str">"data_snapshot"</span>]
+target_cols = [<span class="str">"target_1pdd_5d"</span>, <span class="str">"target_delivery_5pdd_30d"</span>,
+               <span class="str">"target_salao_5pdd_30d"</span>, <span class="str">"dias_ate_1pdd"</span>,
+               <span class="str">"dias_ate_5pdd_del"</span>, <span class="str">"dias_ate_5pdd_sal"</span>]
+feature_cols = [c <span class="kw">for</span> c <span class="kw">in</span> df.columns
+                <span class="kw">if</span> c <span class="kw">not in</span> id_cols + target_cols + [<span class="str">"target_5pdd_30d"</span>]]
+
+<span class="cm"># 3. Split temporal (treino Abr-Mai, teste Jun)</span>
+df[<span class="str">'mes'</span>] = pd.to_datetime(df[<span class="str">'dt_ganho'</span>]).dt.month
+train = df[df[<span class="str">'mes'</span>].isin([<span class="num">4</span>, <span class="num">5</span>])]
+test  = df[df[<span class="str">'mes'</span>] == <span class="num">6</span>]
+
+<span class="cm"># 4. Treinar XGBoost (modelo UNICO — dia_observacao como feature)</span>
+scale = (train[target_col] == <span class="num">0</span>).sum() / (train[target_col] == <span class="num">1</span>).sum()
+model = xgb.XGBClassifier(
+    scale_pos_weight=scale,
+    max_depth=<span class="num">6</span>,
+    learning_rate=<span class="num">0.05</span>,
+    n_estimators=<span class="num">200</span>,
+    eval_metric=<span class="str">'auc'</span>
+)
+model.fit(train[feature_cols], train[target_col])
+
+<span class="cm"># 5. Avaliar</span>
+<span class="kw">from</span> sklearn.metrics <span class="kw">import</span> roc_auc_score
+prob = model.predict_proba(test[feature_cols])[:, <span class="num">1</span>]
+<span class="fn">print</span>(<span class="str">f"AUC: {roc_auc_score(test[target_col], prob):.3f}"</span>)
+
+<span class="cm"># 6. Serializar em sandbox</span>
+<span class="kw">with</span> <span class="fn">open</span>(<span class="str">"/Workspace/Users/kevilyn.berato@ifood.com.br/ml_vitrine/ml_vitrine_model.pkl"</span>, <span class="str">"wb"</span>) <span class="kw">as</span> f:
+    pickle.dump({<span class="str">"model"</span>: model, <span class="str">"features"</span>: feature_cols}, f)</pre>
+
+<h2 style="margin:1.5rem 0 1rem"> Query 3: Score Diário (produção)</h2>
+<p style="color:var(--muted);margin-bottom:0.75rem">Roda TODO DIA no Databricks Workflow. Só features + inferência (sem treino).</p>
+<pre><span class="cm"># Script diario — Databricks Workflow, agenda 7h</span>
+<span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> pickle
+
+<span class="cm"># 1. Carregar modelo serializado</span>
+<span class="kw">with</span> <span class="fn">open</span>(<span class="str">"/Workspace/Users/kevilyn.berato@ifood.com.br/ml_vitrine/ml_vitrine_model.pkl"</span>, <span class="str">"rb"</span>) <span class="kw">as</span> f:
+    saved = pickle.load(f)
+model = saved[<span class="str">"model"</span>]
+feature_cols = saved[<span class="str">"features"</span>]
+
+<span class="cm"># 2. Features dos parceiros ativos (ultimos 5 dias, sem 1pdd)</span>
+df_ativos = spark.sql(<span class="str">"""
+  SELECT * FROM anotaai.sandbox.ml_vitrine_treino_snapshots
+  WHERE dt_ganho >= DATE_ADD(CURRENT_DATE(), -7)
+    AND target_5pdd_30d IS NULL  -- ainda nao ativou (em producao)
+"""</span>).toPandas()
+
+<span class="cm"># 3. Inferencia</span>
+df_ativos[<span class="str">"score_ativar_sozinho"</span>] = model.predict_proba(
+    df_ativos[feature_cols]
+)[:, <span class="num">1</span>]
+
+THRESHOLD = <span class="num">0.30</span>  <span class="cm">-- calibrar com backtest</span>
+df_ativos[<span class="str">"precisa_comercial"</span>] = (
+    df_ativos[<span class="str">"score_ativar_sozinho"</span>] < THRESHOLD
+).astype(<span class="kw">int</span>)
+
+<span class="cm"># 4. Gate D6: quem chegou a D5 sem 1pdd transborda automatico</span>
+df_ativos.loc[
+    df_ativos[<span class="str">"dia_observacao"</span>] >= <span class="num">7</span>,
+    <span class="str">"precisa_comercial"</span>
+] = <span class="num">1</span>
+
+<span class="cm"># 5. Salvar tabela de output</span>
+output = df_ativos[[
+    <span class="str">"merchant_id"</span>, <span class="str">"merchant_name"</span>, <span class="str">"dia_observacao"</span>,
+    <span class="str">"score_ativar_sozinho"</span>, <span class="str">"precisa_comercial"</span>
+]]
+spark.createDataFrame(output).write.mode(<span class="str">"overwrite"</span>)\
+    .saveAsTable(<span class="str">"anotaai.sandbox.ml_vitrine_scoring_diario"</span>)</pre>
+
+<hr>
+
+<h2 style="margin:1.5rem 0 1rem"> Deploy no Databricks</h2>
+<div class="grid-2">
+  <div class="card">
+    <h3>Passo 1 — Criar a tabela de treino</h3>
+    <ol><li>Abrir Databricks Notebook</li><li>Colar <code>ml_vitrine_01_extracao.sql</code> com <code>%sql</code></li><li>Executar → tabela criada</li></ol>
+  </div>
+  <div class="card">
+    <h3>Passo 2 — Treinar e serializar modelo</h3>
+    <ol><li>Rodar notebook 02 (treino) → 03 (avaliação) → 04 (salvar .pkl)</li><li>Modelo salvo em <code>/Workspace/Users/kevilyn.berato@ifood.com.br/ml_vitrine/ml_vitrine_model.pkl</code></li><li>Retreinar mensalmente com dados novos</li></ol>
+  </div>
+  <div class="card">
+    <h3>Passo 3 — Criar Workflow diário</h3>
+    <ol><li>Databricks Workflows → New Job</li><li>Schedule: cron madrugada (extração → inferência)</li><li>Task: notebook 06_daily (percentil por dia + gate D6)</li><li>Output: tabela <code>anotaai.sandbox.ml_vitrine_scoring_diario</code></li></ol>
+  </div>
+  <div class="card">
+    <h3>Passo 4 — Integrar com Salesforce</h3>
+    <ol><li>Time de produto lê <code>ml_vitrine_score_diario</code></li><li>Filtra <code>precisa_comercial = 1</code></li><li>Envia flag via API para Salesforce (campo no objeto do restaurante)</li><li>No Salesforce, roteador usa a flag para alocar</li></ol>
+  </div>
+</div>
+
+<h2 style="margin:1.5rem 0 1rem"> Teste A/B</h2>
+<div class="box box-blue">
+  <ol>
+    <li><strong>Grupo controle:</strong> regra atual (Self até 5 dias, D6 obrigatório)</li>
+    <li><strong>Grupo teste:</strong> decisão do modelo (percentil por dia D1–D5)</li>
+    <li><strong>Métricas:</strong> taxa de 1pdd 5d, taxa de 5pdd 30d, share Self, conversão global</li>
+    <li><strong>Duração:</strong> 2-4 semanas para ter significância estatística</li>
+    <li><strong>Se positivo:</strong> expandir para 50% → 100%</li>
+  </ol>
+</div>
+
+<h2 style="margin:1.5rem 0 1rem"> Próximos passos</h2>
+<table>
+  <thead><tr><th>Prazo</th><th>Ação</th><th>Responsável</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:700">Semana 1</td><td>Rodar query SQL no Databricks, validar features com negócio</td><td>Kevilyn</td></tr>
+    <tr><td style="font-weight:700">Semana 1-2</td><td>Treinar XGBoost, calibrar threshold, backtest</td><td>Kevilyn</td></tr>
+    <tr><td style="font-weight:700">Semana 2-3</td><td>Solicitar ao time de produto automação da flag no Salesforce</td><td>Kevilyn + Produto</td></tr>
+    <tr><td style="font-weight:700">Semana 3-4</td><td>Configurar Workflow diário no Databricks</td><td>Kevilyn</td></tr>
+    <tr><td style="font-weight:700">Semana 4-5</td><td>Iniciar teste A/B (20% modelo vs 80% regra atual)</td><td>Kevilyn + Comercial</td></tr>
+    <tr><td style="font-weight:700">Semana 6-8</td><td>Avaliar resultado, ajustar threshold, expandir</td><td>Kevilyn</td></tr>
+  </tbody>
+</table>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-item"><span class="footer-label">Arquivos:</span><span class="footer-value" style="font-family:monospace;font-size:0.75rem">ml_vitrine_01_extracao.sql · 02_treino.py · 03_avaliacao.py · 04_salvar.py · 05_backtest.py</span></div>
+  <div class="footer-item"><span class="footer-label">Tabela:</span><span class="footer-value" style="font-family:monospace;font-size:0.75rem">anotaai.sandbox.ml_vitrine_treino_snapshots</span></div>
+  <div class="footer-item"><span class="footer-label">Modelo:</span><span class="footer-value">XGBoost v6 · 58 features · AUC 0.8846</span></div>
+  <div class="footer-item"><span class="footer-label">Decisão:</span><span class="footer-value">percentil por dia (15–25%)</span></div>
+  <div class="footer-item"><span class="footer-label">Janela:</span><span class="footer-value">D1→D5 (gate D6)</span></div>
+</div>
+
+</div>
+
+<script>
+function switchTab(e, tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+</script>
+
+</body>
+</html>
